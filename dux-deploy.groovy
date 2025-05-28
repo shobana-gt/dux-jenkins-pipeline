@@ -32,6 +32,8 @@ pipeline {
                             git clone -b ${branchName} ${repoPath} repo
                             cp ${manifestPath} repo/${configDir}/
                             cd repo
+                            git config user.email "${GIT_USER_EMAIL}"
+                            git config user.name "${GIT_USER_NAME}"
                             git add ${configDir}/ts_manifest.yml
                             git commit -m 'created ts_manifest.yml'
                             git push origin ${branchName}
@@ -45,6 +47,8 @@ pipeline {
                                 git clone -b ${branchName} ${repoPath} repo
                                 cp ${manifestPath} repo/${configDir}/
                                 cd repo
+                                git config user.email "${GIT_USER_EMAIL}"
+                                git config user.name "${GIT_USER_NAME}"
                                 git add ${configDir}/ts_manifest.yml
                                 git commit -m 'user edit'
                                 git push origin ${branchName}
@@ -57,15 +61,22 @@ pipeline {
                 }
             }
         }
-        stage('Pre-check Hosts in ts_manifest.yml') {
+       /*  stage('Pre-check Hosts in ts_manifest.yml') {
             steps {
                 script {
                     def manifestPath = '/opt/omnissa/dux/ts_manifest.yml'
-                    def hosts = sh(script: "awk '/hosts:/ {flag=1; next} /:/ {flag=0} flag {print \$1}' ${manifestPath}", returnStdout: true).trim().split("\n")
+                    def hosts = sh(script: "awk '/- address:/ {print \$3}' ${manifestPath}", returnStdout: true).trim().split("\n")
 
                     for (host in hosts) {
                         echo "Checking host: ${host}"
-
+                        // Validate host address
+                        if (!host || !host.matches('^([a-zA-Z0-9.-]+|[0-9]{1,3}(\\.[0-9]{1,3}){3})$')) {
+                            error "Address of host is empty or invalid: ${host}. Exiting pipeline."
+                        }
+                        // Add host key to known_hosts
+                        sh """
+                            ssh-keyscan -H ${host} >> ~/.ssh/known_hosts
+                        """
                         // Check if SSH is enabled
                         def sshCheck = sh(script: "ssh -o BatchMode=yes -o ConnectTimeout=5 ${host} 'echo SSH enabled'", returnStatus: true)
                         if (sshCheck != 0) {
@@ -82,7 +93,7 @@ pipeline {
                     }
                 }
             }
-        }
+        } */
         stage('Run Dux Deploy -d') {
             steps {
                 script {
@@ -99,7 +110,7 @@ pipeline {
                 script {
                     def deployOutput = sh(script: "dux deploy -u ${env.UEM_PASSWORD} -y", returnStdout: true).trim()
                     echo "Dux Deploy Output: ${deployOutput}"
-                    if (!deployOutput.contains("deployment successful")) {
+                    if (!deployOutput.contains("Deployment is up")) {
                         error "Dux Deploy with UEM Password failed. Exiting pipeline."
                     }
                 }
