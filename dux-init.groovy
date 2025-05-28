@@ -28,6 +28,16 @@ pipeline {
                 echo 'Installing Dux DEB package'
                 sh """
                     sudo dpkg -i dux_2.3.0.405-2_amd64.deb
+                    
+                """
+            }
+        }
+                stage('Update Permissions for /opt') {
+            steps {
+                echo 'Updating permissions for /opt directory'
+                sh """
+                    sudo chown -R jenkins:jenkins /opt
+                    sudo chmod -R 775 /opt
                 """
             }
         }
@@ -39,6 +49,7 @@ pipeline {
                     ls -ltr /
                     which dux
                     dux version
+
                 """
             }
         }
@@ -46,8 +57,24 @@ pipeline {
             steps {
                 echo 'Initializing Dux Tunnel'
                 sh """
-                    dux tunnel init
+                    dux init
                 """
+            }
+        }
+        stage('Check ts_manifest.yml') {
+            steps {
+                echo 'Checking if ts_manifest.yml is created'
+                script {
+                    def manifestExists = sh(
+                        script: 'test -f /opt/omnissa/dux/ts_manifest.yml',
+                        returnStatus: true
+                    )
+                    if (manifestExists == 0) {
+                        echo 'ts_manifest.yml file created successfully. Dux initialization succeeded.'
+                    } else {
+                        error 'dux-init failed: ts_manifest.yml file not found.'
+                    }
+                }
             }
         }
     }
