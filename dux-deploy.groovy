@@ -20,7 +20,12 @@ pipeline {
 
                     // Check if last hash file exists
                     def lastHashExists = fileExists(lastHashFile)
-
+                    // Ensure the repo directory is clean
+                    sh """
+                        if [ -d repo ]; then
+                            rm -rf repo
+                        fi
+                    """
                     if (!lastHashExists) {
                         echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
                         sh """
