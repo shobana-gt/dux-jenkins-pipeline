@@ -1,3 +1,5 @@
+def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
+def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
 pipeline {
     agent any
     environment {

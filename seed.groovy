@@ -1,5 +1,7 @@
 import javaposse.jobdsl.dsl.DslFactory
 
+def gitUserEmail = "noreply@example.com"
+def gitUserName = "Jenkins CI"
 
 pipelineJob('dux-init') {
     description('Pipeline to install and initialize Dux')
@@ -18,7 +20,10 @@ pipelineJob('dux-init') {
             scriptPath('dux-init.groovy') // Path to the pipeline script in the repository
         }
     }
-
+    environmentVariables (
+    GIT_USER_EMAIL: "$gitUserEmail",
+    GIT_USER_NAME: "$gitUserName",
+    )
     parameters {
         stringParam('ARTIFACTORY_PATH', 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm', 'Path to the Dux RPM in the artifactory')
         stringParam('IMAGE_PATH', '/path/to/image', 'Path to the image')
@@ -42,7 +47,10 @@ pipelineJob('dux-deploy') {
             scriptPath('dux-deploy.groovy') // Path to the pipeline script in the repository
         }
     }
-
+    environmentVariables (
+    GIT_USER_EMAIL: "$gitUserEmail",
+    GIT_USER_NAME: "$gitUserName",
+    )
     // Define parameters for the pipeline
     parameters {
         stringParam('manifestPath', '/opt/omnissa/dux/ts_manifest.yml', 'Path to the ts_manifest.yml file')
