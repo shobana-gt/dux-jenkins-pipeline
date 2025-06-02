@@ -55,6 +55,19 @@ def containers = [
     'EIC': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
     'SEG': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove']
 ]
+// Helper function to determine the manifest path based on the container name
+def getManifestPath(container) {
+    switch (container.toLowerCase()) {
+        case 'tunnel':
+            return "/opt/omnissa/dux/ts_manifest.yml"
+        case 'eic':
+            return "/opt/omnissa/dux/eic_manifest.yml"
+        case 'seg':
+            return "/opt/omnissa/dux/seg_manifest.yml"
+        default:
+            return "/opt/omnissa/dux/ts_manifest.yml" // Fallback for unknown containers
+    }
+}
 
 // Create folders and jobs
 containers.each { container, jobs ->
@@ -90,11 +103,21 @@ containers.each { container, jobs ->
             )
 
             // Add parameters for specific jobs if needed
-            if (job == 'Deploy') {
+/*             if (job == 'Deploy') {
                 parameters {
                     stringParam('manifestPath', "/opt/omnissa/dux/ts_manifest.yml", "Path to the ts_manifest.yml file for ${container}")
                 }
+            } */
+            if (job == 'Deploy') {
+            parameters {
+                stringParam(
+                    'manifestPath',
+                    getManifestPath(container),
+                    "Path to the manifest file for ${container}"
+                )
+                }
             }
+
         }
     }
 }

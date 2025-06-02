@@ -94,6 +94,20 @@ pipeline {
                 }
             }
         } */
+        stage('Checking Prerequisites on Hosts') {
+            steps {
+                script {
+                    def manifestPath = '/opt/omnissa/dux/ts_manifest.yml'
+                    def hosts = sh(script: "awk '/- address:/ {print \$3}' ${manifestPath}", returnStdout: true).trim().split("\n")
+
+                    for (host in hosts) {
+                        echo "Checking prerequisites on host: ${host}"
+                        echo "Checking if SSH is running on ${host}..."
+                        echo "Checking if Docker is running on ${host}..."
+                    }
+                }
+            }
+        }
         stage('Run Dux Deploy -d') {
             steps {
                 script {

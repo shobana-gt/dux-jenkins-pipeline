@@ -23,7 +23,7 @@ pipeline {
                     try {
                         // Execute the `dux status` command
                         def statusOutput = sh(script: "dux status", returnStdout: true).trim()
-                        echo "dux status comamnd output:\n${statusOutput}"
+                        echo "dux status command output:\n${statusOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux status` command fails
                         error "Failed to execute 'dux status'. Error: ${e.message}"
