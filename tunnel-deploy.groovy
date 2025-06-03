@@ -1,18 +1,31 @@
 def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
 def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
+def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
+def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
+
 pipeline {
     agent any
     environment {
         UEM_PASSWORD = credentials('uem-pword') // Fetch the UEM password from Jenkins credentials
     }
+    parameters {
+           string(name: 'CLUSTER_BRANCH',
+               defaultValue: null,
+               description: 'Branch to checkout from cluster secrets repository')
+            string(
+                    name: 'manifestPath',
+                    defaultValue: '/opt/omnissa/dux/ts_manifest.yml',
+                    description: 'Path to the manifest file for Tunnel')
+
+    }
     stages {
         stage('Check ts_manifest.yml Changes') {
             steps {
                 script {
-                    def manifestPath = '/opt/omnissa/dux/ts_manifest.yml'
+                    def manifestPath = params.manifestPath
                     def lastHashFile = '/var/lib/jenkins/last_ts_manifest_md5'
-                    def repoPath = 'git@github.com:shobana-gt/dux-jenkins-pipeline.git'
-                    def branchName = 'jenkins-dux-pipeline' // Use the branch configured in seed.groovy
+                    def repoPath = CLUSTER_CREDS_REPO
+                    def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
                     def configDir = 'config'
 
                     // Calculate current hash of ts_manifest.yml
@@ -27,9 +40,10 @@ pipeline {
                         fi
                     """
                     if (!lastHashExists) {
-                        echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
+                 echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
+                    withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
                         sh """
-                            git clone -b ${branchName} ${repoPath} repo
+                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
                             cp ${manifestPath} repo/${configDir}/
                             cd repo
                             git config user.email "${GIT_USER_EMAIL}"
@@ -38,13 +52,15 @@ pipeline {
                             git commit -m 'created ts_manifest.yml'
                             git push origin ${branchName}
                         """
-                        writeFile file: lastHashFile, text: currentHash
+                    }
+                    writeFile file: lastHashFile, text: currentHash
                     } else {
                         def lastHash = readFile(lastHashFile).trim()
                         if (currentHash != lastHash) {
-                            echo "File has changed: Pushing ts_manifest.yml to GitHub with comment 'user edit'"
+                        echo "File has changed: Pushing ts_manifest.yml to GitHub with comment 'user edit'"
+                        withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
                             sh """
-                                git clone -b ${branchName} ${repoPath} repo
+                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
                                 cp ${manifestPath} repo/${configDir}/
                                 cd repo
                                 git config user.email "${GIT_USER_EMAIL}"
@@ -53,7 +69,8 @@ pipeline {
                                 git commit -m 'user edit'
                                 git push origin ${branchName}
                             """
-                            writeFile file: lastHashFile, text: currentHash
+                        }
+                        writeFile file: lastHashFile, text: currentHash
                         } else {
                             echo "No changes detected in ts_manifest.yml"
                         }

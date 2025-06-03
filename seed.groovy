@@ -1,6 +1,12 @@
 import javaposse.jobdsl.dsl.DslFactory
 import org.jenkinsci.plugins.scriptsecurity.scripts.*
 
+// CHANGEME
+//////////////// THE following are the settings to apply to individual pipelines //////////////////
+def clusterCredsRepository = "git@github.com:shobana-gt/container-cluster-config.git"
+def clusterCredsGitCredRef = "github-ssh-key"
+
+// GIT USER CONFIG TO COMMIT CLUSTER CREDS
 def gitUserEmail = "noreply@example.com"
 def gitUserName = "Jenkins CI"
 
@@ -99,7 +105,9 @@ containers.each { container, jobs ->
 
             environmentVariables(
                 GIT_USER_EMAIL: "$gitUserEmail",
-                GIT_USER_NAME: "$gitUserName"
+                GIT_USER_NAME: "$gitUserName",
+                CLUSTER_CREDS_REPO: "$clusterCredsRepository",
+                CLUSTER_CREDS_GIT_CRED_REF: "$clusterCredsGitCredRef"
             )
 
             // Add parameters for specific jobs if needed
@@ -109,12 +117,15 @@ containers.each { container, jobs ->
                 }
             } */
             if (job == 'Deploy') {
+
             parameters {
                 stringParam(
                     'manifestPath',
                     getManifestPath(container),
                     "Path to the manifest file for ${container}"
                 )
+                stringParam('CLUSTER_BRANCH', null, 'Branch to checkout from cluster secrets repository')
+
                 }
             }
 
