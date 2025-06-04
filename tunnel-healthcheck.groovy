@@ -1,38 +1,34 @@
 pipeline {
     agent any
     parameters {
-        activeChoice(
+        choice(
             name: 'HOST_IP',
-            description: 'Select the IP address of the host (or "All" for all hosts)',
-            choiceType: 'SINGLE_SELECT', // Dropdown list
-            script: [
-                classpath: [],
-                sandbox: true,
-                script: '''
-                    // Read the manifest file and extract IP addresses
-                    def manifestPath = '/opt/omnissa/dux/ts_manifest.yml'
-                    def ips = ['All'] // Add "All" as the first option
-                    def manifestFile = new File(manifestPath)
-                    if (manifestFile.exists()) {
-                        def manifestContent = manifestFile.text
-                        def yaml = new org.yaml.snakeyaml.Yaml()
-                        def manifest = yaml.load(manifestContent)
-                        // Assuming the manifest has a structure like:
-                        // hosts:
-                        //   - address: 10.87.132.166
-                        //   - address: 10.87.132.167
-                        manifest.hosts.each { host ->
-                            ips << host.address
-                        }
-                    } else {
-                        ips << 'Manifest file not found'
-                    }
-                    return ips
-                '''
-            ]
+            choices: getHostIPs(),
+            description: 'Select the IP address of the host (or "All" for all hosts)'
         )
     }
     stages {
+        stage('Prepare Workspace') {
+            steps {
+                sh 'cp /opt/omnissa/dux/ts_manifest.yml ${WORKSPACE}/ts_manifest.yml'
+            }
+        }
+        stage('Debug File Existence') {
+            steps {
+                script {
+                    def fileExists = fileExists('ts_manifest.yml')
+                    echo "Manifest file exists: ${fileExists}"
+                }
+            }
+        }
+/*         stage('Debug Host IPs') {
+            steps {
+                script {
+                    def ips = getHostIPs()
+                    echo "Available IPs:\n${ips}"
+                }
+            }
+        } */
         stage('Run Dux Health Check') {
             steps {
                 script {
@@ -60,4 +56,38 @@ pipeline {
             echo "Dux Health Check failed."
         }
     }
+}
+
+def getHostIPs() {
+    def ips = ['All'] // Add "All" as the first option
+
+    node {
+        try {
+            def manifestPath = 'ts_manifest.yml' // Ensure the file is in the workspace
+
+            // Read the manifest file from the workspace
+            def manifestContent = readFile(manifestPath)
+            echo "Manifest Content:\n${manifestContent}" // Debug log
+
+            def yaml = new org.yaml.snakeyaml.Yaml()
+            def manifest = yaml.load(manifestContent)
+
+            // Navigate to the `hosts` section and extract the `address` field
+            if (manifest.tunnel_server?.hosts) {
+                manifest.tunnel_server.hosts.each { host ->
+                    if (host.address) {
+                        ips << host.address
+                    }
+                }
+            } else {
+                echo "No hosts found in the manifest file."
+            }
+
+            echo "Extracted IPs: ${ips}" // Debug log
+        } catch (Exception e) {
+            error "Failed to read or parse the manifest file: ${e.message}" // Fail the pipeline
+        }
+    }
+
+    return ips.join('\n') // Return as a newline-separated string for the `choice` parameter
 }
