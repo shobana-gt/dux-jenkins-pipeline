@@ -116,6 +116,16 @@ containers.each { container, jobs ->
                     stringParam('manifestPath', "/opt/omnissa/dux/ts_manifest.yml", "Path to the ts_manifest.yml file for ${container}")
                 }
             } */
+            // Add parameters only for the Init job
+            if (job == 'Init') {
+                parameters {
+                    stringParam(
+                        'ARTIFACTORY_PATH',
+                        'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm',
+                        'Path to the Dux RPM in the artifactory'
+                    )
+                }
+            }
             if (job == 'Deploy') {
 
             parameters {
