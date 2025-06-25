@@ -47,7 +47,7 @@ pipeline {
                         echo "Dux version is 3 or higher. Running 'dux tunnel status'..."
                         command = params.HOST_IP == 'All' ? 'dux tunnel status' : "dux tunnel status -p ${params.HOST_IP}"
                     } else {
-                        echo "Dux version is less than 3. Running 'dux init'..."
+                        echo "Dux version is less than 3. Running 'dux status'..."
                         command = params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"
                     }
                         

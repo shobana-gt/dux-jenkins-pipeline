@@ -1,4 +1,8 @@
 
+def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
+def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
+def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
+def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
 pipeline {
     agent any
     parameters {
@@ -120,16 +124,90 @@ pipeline {
 
                     // Extract the first digit of the version
                     def majorVersion = duxVersion.tokenize('.')[0] as int
+                                // Check if the manifest exists
+            def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
+            def manifestExists = fileExists(manifestPath)
 
+            if (manifestExists) {
+                echo "Manifest already exists at ${manifestPath}."
                     if (majorVersion >= 3) {
                         echo "Dux version is 3 or higher. Running 'dux tunnel init -u'..."
-                        sh """
-                            echo y | dux tunnel init -u
-                        """
+
+                    def initOutput = sh(script: "echo y | dux tunnel init -u 2>&1", returnStdout: true).trim()
+                    echo "Dux Tunnel Init Output: ${initOutput}"
+                        if (initOutput.contains("updated successfully")) {
+                            echo "Manifest updated successfully. Proceeding to update ts_manifest.yml to the cluster repository..."
+
+                            // Logic to update ts_manifest.yml to the cluster repository
+                            //def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
+                            def lastHashFile = '/var/lib/jenkins/last_ts_manifest_md5'
+                            def repoPath = CLUSTER_CREDS_REPO
+                            def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
+                            def configDir = 'config'
+
+                            // Calculate current hash of ts_manifest.yml
+                            def currentHash = sh(script: "md5sum ${manifestPath} | awk '{print \$1}'", returnStdout: true).trim()
+
+                            // Check if last hash file exists
+                            def lastHashExists = fileExists(lastHashFile)
+                            // Ensure the repo directory is clean
+                            sh """
+                                if [ -d repo ]; then
+                                    rm -rf repo
+                                fi
+                            """
+                            if (!lastHashExists) {
+                                echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
+                                withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                    sh """
+                                        GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
+                                        cp ${manifestPath} repo/${configDir}/
+                                        cd repo
+                                        git config user.email "${GIT_USER_EMAIL}"
+                                        git config user.name "${GIT_USER_NAME}"
+                                        git add ${configDir}/ts_manifest.yml
+                                        git commit -m 'created ts_manifest.yml'
+                                        git push origin ${branchName}
+                                    """
+                                }
+                                writeFile file: lastHashFile, text: currentHash
+                            } else {
+                                def lastHash = readFile(lastHashFile).trim()
+                                if (currentHash != lastHash) {
+                                    echo "File has changed: Pushing ts_manifest.yml to GitHub with comment 'user edit'"
+                                    withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                        sh """
+                                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
+                                            cp ${manifestPath} repo/${configDir}/
+                                            cd repo
+                                            git config user.email "${GIT_USER_EMAIL}"
+                                            git config user.name "${GIT_USER_NAME}"
+                                            git add ${configDir}/ts_manifest.yml
+                                            git commit -m 'user edit'
+                                            git push origin ${branchName}
+                                        """
+                                    }
+                                    writeFile file: lastHashFile, text: currentHash
+                                } else {
+                                    echo "No changes detected in ts_manifest.yml"
+                                }
+                            }
+                        }
                     } else {
-                        echo "Dux version is less than 3. Running 'dux init'..."
-                        sh "dux init"
+                        echo "Dux version is less than 3. Manifest already exists. Please check and update the manifest if needed."
+
                     }
+                }
+             else {
+                echo "Manifest does not exist at ${manifestPath}."
+                if (majorVersion >= 3) {
+                    echo "Dux version is 3 or higher. Running 'dux tunnel init' to create the manifest..."
+                    sh "dux tunnel init"
+                } else {
+                    echo "Dux version is less than 3. Running 'dux init' to create the manifest..."
+                    sh "dux init"
+                }
+            }
                 }
             }
         }
