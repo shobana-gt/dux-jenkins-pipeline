@@ -33,16 +33,30 @@ pipeline {
             steps {
                 script {
                     echo "Running Dux Health Check..."
+                    def command = "" // Define the command variable outside the try block
+
                     try {
-                        // Determine the command to execute based on the selected IP
-                        def command = params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"
+                    echo "Checking Dux version..."
+                    def duxVersion = sh(script: "dux version | tail -n 1", returnStdout: true).trim()
+                    echo "Dux version detected: ${duxVersion}"
+
+                    // Extract the first digit of the version
+                    def majorVersion = duxVersion.tokenize('.')[0] as int
+
+                    if (majorVersion >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux tunnel status'..."
+                        command = params.HOST_IP == 'All' ? 'dux tunnel status' : "dux tunnel status -p ${params.HOST_IP}"
+                    } else {
+                        echo "Dux version is less than 3. Running 'dux init'..."
+                        command = params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"
+                    }
                         
                         // Execute the command
                         def statusOutput = sh(script: command, returnStdout: true).trim()
                         echo "Dux Status Output:\n${statusOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux status` command fails
-                        error "Failed to execute '${params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"}'. Error: ${e.message}"
+                        error "Failed to execute '${command}'. Error: ${e.message}"
                     }
                 }
             }
