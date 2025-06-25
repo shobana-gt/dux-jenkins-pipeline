@@ -49,9 +49,13 @@ pipeline {
                                 sudo apt install -y alien
                                 sudo alien -d ${rpmFileName}
                             """
+                            
+                            // Dynamically determine the generated .deb file name
+                            def debFileName = sh(script: "ls *.deb | grep '^dux_'", returnStdout: true).trim()
+                            echo "Generated DEB file name: ${debFileName}"
 
                             echo "Installing Dux DEB package"
-                            def debFileName = rpmFileName.replace('.rpm', '.deb')
+  
                             sh """
                                 sudo dpkg -i ${debFileName}
                             """
@@ -86,6 +90,15 @@ pipeline {
                 }
             }
         }
+        stage('Cleanup Workspace') {
+            steps {
+                script {
+                    echo "Cleaning up .deb files from the workspace..."
+                    sh "rm -f *.deb"
+                    echo "Cleanup completed."
+                }
+            }
+        }
         stage('Verify Installation') {
             steps {
                 script {
@@ -101,8 +114,22 @@ pipeline {
         stage('Initialize Dux Tunnel') {
             steps {
                 script {
-                    echo "Initializing Dux Tunnel..."
-                    sh "dux init"
+                    echo "Checking Dux version..."
+                    def duxVersion = sh(script: "dux version | tail -n 1", returnStdout: true).trim()
+                    echo "Dux version detected: ${duxVersion}"
+
+                    // Extract the first digit of the version
+                    def majorVersion = duxVersion.tokenize('.')[0] as int
+
+                    if (majorVersion >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux tunnel init -u'..."
+                        sh """
+                            echo y | dux tunnel init -u
+                        """
+                    } else {
+                        echo "Dux version is less than 3. Running 'dux init'..."
+                        sh "dux init"
+                    }
                 }
             }
         }
