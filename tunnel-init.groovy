@@ -1,4 +1,134 @@
+
 pipeline {
+    agent any
+    parameters {
+        string(name: 'ARTIFACTORY_PATH', defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm', description: 'Path to the Dux RPM in the artifactory')
+    }
+    stages {
+        stage('Install Dux if Not Installed') {
+            steps {
+                script {
+                    if (params.ARTIFACTORY_PATH?.trim()) {
+                        echo "ARTIFACTORY_PATH provided: ${params.ARTIFACTORY_PATH}"
+                        
+                        echo "Checking if Dux is already installed..."
+                        def duxExists = sh(script: "command -v dux", returnStatus: true) == 0
+
+                        if (duxExists) {
+                            echo "Dux is already installed. Proceeding with uninstallation..."
+                            def osType = sh(script: "cat /etc/os-release | grep '^ID=' | cut -d'=' -f2", returnStdout: true).trim()
+
+                            if (osType == "ubuntu") {
+                                echo "OS is Ubuntu. Uninstalling Dux using dpkg..."
+                                sh "sudo dpkg --remove dux || true"
+                            } else {
+                                echo "OS is not Ubuntu. Uninstalling Dux using rpm..."
+                                def duxInstalled = sh(script: "rpm -qa | grep dux", returnStdout: true).trim()
+                                sh "sudo rpm -e ${duxInstalled}"
+                            }
+                        } else {
+                            echo "Dux is not installed. Proceeding with installation..."
+                        }
+
+                        // Extract the file name from the ARTIFACTORY_PATH
+                        def rpmFileName = params.ARTIFACTORY_PATH.tokenize('/').last()
+                        echo "Extracted RPM file name: ${rpmFileName}"
+
+                        echo "Downloading Dux RPM from ${params.ARTIFACTORY_PATH}"
+                        sh """
+                            curl -O ${params.ARTIFACTORY_PATH}
+                        """
+
+                        // Check the OS type again for installation
+                        def osType = sh(script: "cat /etc/os-release | grep '^ID=' | cut -d'=' -f2", returnStdout: true).trim()
+
+                        if (osType == "ubuntu") {
+                            echo "Converting RPM to DEB for Ubuntu..."
+                            sh """
+                                sudo apt update
+                                sudo apt install -y alien
+                                sudo alien -d ${rpmFileName}
+                            """
+
+                            echo "Installing Dux DEB package"
+                            def debFileName = rpmFileName.replace('.rpm', '.deb')
+                            sh """
+                                sudo dpkg -i ${debFileName}
+                            """
+
+                            echo "Updating permissions for /opt directory"
+                            sh """
+                                sudo chown -R jenkins:jenkins /opt
+                                sudo chmod -R 775 /opt
+                            """
+                        } else if (osType == "centos" || osType == "rhel" || osType == "fedora") {
+                            echo "Installing RPM directly for non-Ubuntu systems..."
+                            sh "sudo rpm -i ${rpmFileName}"
+                        } else {
+                            error "Unsupported OS type: ${osType}. Exiting pipeline."
+                        }
+
+                        // Verify directory structure after installation
+                        def directories = [
+                            "/opt/omnissa/dux/",
+                            "/opt/omnissa/dux/images/",
+                            "/opt/omnissa/dux/logs/"
+                        ]
+                        directories.each { dir ->
+                            if (!fileExists(dir)) {
+                                error "Directory ${dir} does not exist after installation. Exiting pipeline."
+                            }
+                        }
+                        echo "Dux installation completed successfully."
+                    } else {
+                        echo "ARTIFACTORY_PATH not provided. Skipping installation."
+                    }
+                }
+            }
+        }
+        stage('Verify Installation') {
+            steps {
+                script {
+                    echo "Verifying Dux installation..."
+                    def duxExists = sh(script: "command -v dux", returnStatus: true) == 0
+                    if (!duxExists) {
+                        error "Dux command not found after installation. Exiting pipeline."
+                    }
+                    echo "Dux is installed and verified."
+                }
+            }
+        }
+        stage('Initialize Dux Tunnel') {
+            steps {
+                script {
+                    echo "Initializing Dux Tunnel..."
+                    sh "dux init"
+                }
+            }
+        }
+        stage('Check ts_manifest.yml') {
+            steps {
+                script {
+                    def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
+                    if (fileExists(manifestPath)) {
+                        echo "ts_manifest.yml already exists. Update the manifest if needed."
+                    } else {
+                        echo "ts_manifest.yml does not exist. Proceed with creating it if required."
+                    }
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo "Tunnel initialization pipeline completed successfully."
+        }
+        failure {
+            echo "Tunnel initialization pipeline failed."
+        }
+    }
+}
+/* pipeline {
     agent any
     parameters {
         string(name: 'ARTIFACTORY_PATH', defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm', description: 'Path to the Dux RPM in the artifactory')
@@ -139,4 +269,4 @@ pipeline {
             echo "Tunnel initialization pipeline failed."
         }
     }
-}
+} */
