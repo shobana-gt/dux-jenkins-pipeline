@@ -126,6 +126,7 @@ containers.each { container, jobs ->
                         'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm',
                         'Path to the Dux RPM in the artifactory'
                     )
+                    stringParam('CLUSTER_BRANCH', null, 'Branch to checkout from cluster secrets repository')
                 }
             }
             if (job == 'Deploy') {

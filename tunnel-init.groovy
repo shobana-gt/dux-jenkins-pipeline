@@ -3,11 +3,14 @@ def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
 def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
 def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
 def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
-def CLUSTER_BRANCH = env.CLUSTER_BRANCH  // Default to 'main' if not set
+//def CLUSTER_BRANCH = env.CLUSTER_BRANCH  // Default to 'main' if not set
 pipeline {
     agent any
     parameters {
         string(name: 'ARTIFACTORY_PATH', defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm', description: 'Path to the Dux RPM in the artifactory')
+        string(name: 'CLUSTER_BRANCH',
+               defaultValue: null,
+               description: 'Branch to checkout from cluster secrets repository')
     }
     stages {
         stage('Install Dux if Not Installed') {
@@ -147,7 +150,7 @@ pipeline {
                             //def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
                             def lastHashFile = '/var/lib/jenkins/last_ts_manifest_md5'
                             def repoPath = CLUSTER_CREDS_REPO
-                            def branchName = env.CLUSTER_BRANCH // Use the branch configured in seed.groovy
+                            def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
                             def configDir = 'config'
 
                             // Calculate current hash of ts_manifest.yml
