@@ -34,7 +34,7 @@ pipeline {
                         echo "Dux version is 3 or higher. Running 'dux tunnel stop'..."
                         command = params.HOST_IP == 'All' ? 'dux tunnel stop -y' : "dux tunnel stop -y -p ${params.HOST_IP}"
                     } else {
-                        echo "Dux version is less than 3. Running 'dux logs'..."
+                        echo "Dux version is less than 3. Running 'dux restart'..."
                         command = params.HOST_IP == 'All' ? 'dux stop -y' : "dux stop -y -p ${params.HOST_IP}"
                     }
                     try {
