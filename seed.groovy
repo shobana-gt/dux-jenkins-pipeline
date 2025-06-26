@@ -5,6 +5,7 @@ import org.jenkinsci.plugins.scriptsecurity.scripts.*
 //////////////// THE following are the settings to apply to individual pipelines //////////////////
 def clusterCredsRepository = "git@github.com:shobana-gt/container-cluster-config.git"
 def clusterCredsGitCredRef = "github-ssh-key"
+def clusterCredsBranch = "test"
 
 // GIT USER CONFIG TO COMMIT CLUSTER CREDS
 def gitUserEmail = "noreply@example.com"
@@ -107,7 +108,8 @@ containers.each { container, jobs ->
                 GIT_USER_EMAIL: "$gitUserEmail",
                 GIT_USER_NAME: "$gitUserName",
                 CLUSTER_CREDS_REPO: "$clusterCredsRepository",
-                CLUSTER_CREDS_GIT_CRED_REF: "$clusterCredsGitCredRef"
+                CLUSTER_CREDS_GIT_CRED_REF: "$clusterCredsGitCredRef",
+                CLUSTER_BRANCH: "$clusterCredsBranch"
             )
 
             // Add parameters for specific jobs if needed

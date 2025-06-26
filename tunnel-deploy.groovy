@@ -2,6 +2,7 @@ def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
 def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
 def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
 def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
+def CLUSTER_BRANCH = env.CLUSTER_BRANCH 
 
 pipeline {
     agent any

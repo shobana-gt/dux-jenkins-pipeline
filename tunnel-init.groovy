@@ -3,6 +3,7 @@ def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
 def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
 def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
 def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
+def CLUSTER_BRANCH = env.CLUSTER_BRANCH  // Default to 'main' if not set
 pipeline {
     agent any
     parameters {
@@ -135,14 +136,18 @@ pipeline {
 
                     def initOutput = sh(script: "echo y | dux tunnel init -u 2>&1", returnStdout: true).trim()
                     echo "Dux Tunnel Init Output: ${initOutput}"
-                        if (initOutput.contains("updated successfully")) {
+                    // If output contains "Updating comments in the manifest file", it means the manifest was updated 
+                    // but no need to update it to the cluster repository
+                    if (initOutput.contains("Updating comments in the manifest file")) {
+                        echo "Manifest already exists and was updated. No need to update ts_manifest.yml to the cluster repository."
+                    } else if (initOutput.contains("updated successfully")) {
                             echo "Manifest updated successfully. Proceeding to update ts_manifest.yml to the cluster repository..."
 
                             // Logic to update ts_manifest.yml to the cluster repository
                             //def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
                             def lastHashFile = '/var/lib/jenkins/last_ts_manifest_md5'
                             def repoPath = CLUSTER_CREDS_REPO
-                            def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
+                            def branchName = env.CLUSTER_BRANCH // Use the branch configured in seed.groovy
                             def configDir = 'config'
 
                             // Calculate current hash of ts_manifest.yml
@@ -192,6 +197,9 @@ pipeline {
                                     echo "No changes detected in ts_manifest.yml"
                                 }
                             }
+                        } else {
+                            echo "Manifest update failed. Please check the output for errors."
+                            error "Dux tunnel init failed. Check the errors. Exiting pipeline."
                         }
                     } else {
                         echo "Dux version is less than 3. Manifest already exists. Please check and update the manifest if needed."
