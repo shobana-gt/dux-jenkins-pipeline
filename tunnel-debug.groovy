@@ -87,7 +87,7 @@ def getHostIPs() {
 
     node {
         try {
-            def manifestPath = "${env.WORKSPACE}/ts_manifest.yml"
+            def manifestPath = "/opt/omnissa/dux/ts_manifest.yml"
 
             def manifestContent = readFile(manifestPath)
             echo "Manifest Content:\n${manifestContent}"
