@@ -202,8 +202,7 @@ pipeline {
                             error "Dux tunnel init failed. Check the errors. Exiting pipeline."
                         }
                     } else {
-                        echo "Dux version is less than 3. Manifest already exists. Please check and update the manifest if needed."
-
+                        error "Manifest already exists. Manifest auto update is not supported as dux version is less than 3.0.  Please check and update the manifest manually to avoid issues."
                     }
                 }
              else {
