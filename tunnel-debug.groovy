@@ -1,6 +1,13 @@
 def DUX_MAJOR_VERSION = 0
 pipeline {
     agent any
+    parameters {
+        choice(
+            name: 'HOST_IP',
+            choices: getHostIPs(),
+            description: 'Select the IP address of the host (or "All" for all hosts)'
+        )
+    }
     stages {
         stage('Set Dux Major Version') {
             steps {
@@ -78,4 +85,38 @@ pipeline {
             echo "Dux Debug job failed."
         }
     }
+}
+
+def getHostIPs() {
+    def ips = ['All'] // Add "All" as the first option
+
+    node {
+        try {
+            def manifestPath = 'ts_manifest.yml' // Ensure the file is in the workspace
+
+            // Read the manifest file from the workspace
+            def manifestContent = readFile(manifestPath)
+            echo "Manifest Content:\n${manifestContent}" // Debug log
+
+            def yaml = new org.yaml.snakeyaml.Yaml()
+            def manifest = yaml.load(manifestContent)
+
+            // Navigate to the `hosts` section and extract the `address` field
+            if (manifest.tunnel_server?.hosts) {
+                manifest.tunnel_server.hosts.each { host ->
+                    if (host.address) {
+                        ips << host.address
+                    }
+                }
+            } else {
+                echo "No hosts found in the manifest file."
+            }
+
+            echo "Extracted IPs: ${ips}" // Debug log
+        } catch (Exception e) {
+            error "Failed to read or parse the manifest file: ${e.message}" // Fail the pipeline
+        }
+    }
+
+    return ips.join('\n') // Return as a newline-separated string for the `choice` parameter
 }
