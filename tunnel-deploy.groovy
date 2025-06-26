@@ -3,23 +3,44 @@ def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
 def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
 def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
 def CLUSTER_BRANCH = env.CLUSTER_BRANCH 
-
+node {
+    // Prepare the workspace and copy the manifest file
+    sh "cp /opt/omnissa/dux/ts_manifest.yml ${env.WORKSPACE}/ts_manifest.yml"
+}
 pipeline {
     agent any
     environment {
         UEM_PASSWORD = credentials('uem-pword') // Fetch the UEM password from Jenkins credentials
     }
+
     parameters {
-           string(name: 'CLUSTER_BRANCH',
+        choice(
+            name: 'HOST_IP',
+            choices: getHostIPs(),
+            description: 'Select the IP address of the host (or "All" for all hosts)'
+        )
+        string(name: 'CLUSTER_BRANCH',
                defaultValue: null,
                description: 'Branch to checkout from cluster secrets repository')
-            string(
+        string(
                     name: 'manifestPath',
                     defaultValue: '/opt/omnissa/dux/ts_manifest.yml',
                     description: 'Path to the manifest file for Tunnel')
 
     }
     stages {
+        stage('Set Dux Major Version') {
+            steps {
+                script {
+                    def duxVersion = sh(script: "dux version | tail -n 1", returnStdout: true).trim()
+                    echo "Dux version detected: ${duxVersion}"
+
+                    // Extract the first digit of the version
+                    env.DUX_MAJOR_VERSION = duxVersion.tokenize('.')[0]
+                    echo "Dux major version set to: ${env.DUX_MAJOR_VERSION}"
+                }
+            }
+        }
         stage('Check ts_manifest.yml Changes') {
             steps {
                 script {
@@ -112,7 +133,7 @@ pipeline {
                 }
             }
         } */
-        stage('Checking Prerequisites on Hosts') {
+         /*stage('Checking Prerequisites on Hosts') {
             steps {
                 script {
                     def manifestPath = '/opt/omnissa/dux/ts_manifest.yml'
@@ -125,34 +146,84 @@ pipeline {
                     }
                 }
             }
-        }
+        } */
         stage('Run Dux Deploy -d') {
             steps {
                 script {
-                    def deployOutput = sh(script: "dux deploy -d", returnStdout: true).trim()
-                    echo "Dux Deploy Output: ${deployOutput}"
-                    if (deployOutput.contains("error")) {
-                        error "Dux Deploy -d failed with errors. Exiting pipeline."
+                    echo "Running Dux Deploy -d to deploy the container..."
+                    def command = ""
+
+                    if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux tunnel deploy -d'..."
+                        command = 'dux tunnel deploy -d' 
+                    } else {
+                        echo "Dux version is less than 3. Running 'dux deploy -d'..."
+                        command = 'dux deploy -d'
                     }
+                    try {
+                        // Execute the `dux deploy -d` command
+                        def dryRunOutput = sh(script: command, returnStdout: true).trim()
+                        echo "dux deploy dryrun command output:\n${dryRunOutput}"
+                    } catch (Exception e) {
+                        // Handle errors if the `dux deploy -d` command fails
+                        error "Failed to execute '${command}'. Error: ${e.message}. Exiting pipeline"
+                    }
+
                 }
             }
         }
         stage('Run Dux Deploy with UEM Password') {
             steps {
                 script {
-                    def deployOutput = sh(script: "dux deploy -u ${env.UEM_PASSWORD} -y", returnStdout: true).trim()
-                    echo "Dux Deploy Output: ${deployOutput}"
-                    if (!deployOutput.contains("Deployment is up")) {
-                        error "Dux Deploy with UEM Password failed. Exiting pipeline."
+                    def command = ""
+
+                    if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux tunnel deploy'..."
+                        command = params.HOST_IP == 'All' ? "dux tunnel deploy -u ${env.UEM_PASSWORD} -y" : "dux deploy -u ${env.UEM_PASSWORD} -y -p ${params.HOST_IP}"
+                    } else {
+                        echo "Dux version is less than 3. Running 'dux deploy'..."
+                        command = params.HOST_IP == 'All' ? "dux deploy -u ${env.UEM_PASSWORD} -y" : "dux deploy -u ${env.UEM_PASSWORD} -y -p ${params.HOST_IP}"
                     }
+                    try {
+                        // Execute the `dux stop` command
+                        def deployOutput = sh(script: command, returnStdout: true).trim()
+                        echo "dux deploy command output:\n${deployOutput}"
+
+                        if (!deployOutput.contains("Deployment is up")) {
+                            error "Dux Deploy with UEM Password failed. Exiting pipeline."
+                        }
+
+                    } catch (Exception e) {
+                        // Handle errors if the `dux stop` command fails
+                        error "Failed to execute '${command}'. Error: ${e.message}"
+                    }
+
                 }
             }
         }
         stage('Check Dux Status') {
             steps {
                 script {
-                    def statusOutput = sh(script: "dux status", returnStdout: true).trim()
-                    echo "Dux Status Output: ${statusOutput}"
+                    echo "Checking Status of deployments..."
+                    def command = "" // Define the command variable outside the try block
+
+                    if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux tunnel status'..."
+                        command = params.HOST_IP == 'All' ? 'dux tunnel status' : "dux tunnel status -p ${params.HOST_IP}"
+                    } else {
+                        echo "Dux version is less than 3. Running 'dux status'..."
+                        command = params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"
+                    }
+
+                    
+                    try {
+                        // Execute the `dux status` command
+                        def statusOutput = sh(script: command, returnStdout: true).trim()
+                        echo "dux status command output:\n${statusOutput}"
+                    } catch (Exception e) {
+                        // Handle errors if the `dux status` command fails
+                        error "Failed to execute '$command'. Error: ${e.message}"
+                    }
                 }
             }
         }
@@ -165,4 +236,36 @@ pipeline {
             echo "Pipeline executed successfully."
         }
     }
+}
+
+def getHostIPs() {
+    def ips = ['All']
+
+    node {
+        try {
+            def manifestPath = "${env.WORKSPACE}/ts_manifest.yml"
+
+            def manifestContent = readFile(manifestPath)
+            echo "Manifest Content:\n${manifestContent}"
+
+            def yaml = new org.yaml.snakeyaml.Yaml()
+            def manifest = yaml.load(manifestContent)
+
+            if (manifest.tunnel_server?.hosts) {
+                manifest.tunnel_server.hosts.each { host ->
+                    if (host.address) {
+                        ips << host.address
+                    }
+                }
+            } else {
+                echo "No hosts found in the manifest file."
+            }
+
+            echo "Extracted IPs: ${ips}"
+        } catch (Exception e) {
+            echo "Failed to read or parse the manifest file: ${e.message}"
+        }
+    }
+
+    return ips.join('\n')
 }
