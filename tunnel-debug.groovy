@@ -8,7 +8,7 @@ pipeline {
         )
     }
     stages {
-        stage('Prepare Workspace') {
+/*         stage('Prepare Workspace') {
             steps {
                 sh "cp /opt/omnissa/dux/ts_manifest.yml ${env.WORKSPACE}/ts_manifest.yml"
             }
@@ -20,7 +20,7 @@ pipeline {
                     echo "Manifest file exists: ${fileExists}"
                 }
             }
-        }
+        } */
         stage('Set Dux Major Version') {
             steps {
                 script {
