@@ -1,6 +1,6 @@
 node {
     // Prepare the workspace and copy the manifest file
-    sh "cp /opt/omnissa/dux/ts_manifest.yml ${env.WORKSPACE}/ts_manifest.yml"
+    sh "cp /opt/omnissa/dux/seg_manifest.yml ${env.WORKSPACE}/seg_manifest.yml"
 }
 pipeline {
     agent any
@@ -24,28 +24,26 @@ pipeline {
                 }
             }
         }
-        stage('Remove Container') {
+        stage('Restart Container') {
             steps {
                 script {
-                    echo "Removing container..."
+                    echo "Restarting container deployed..."
                     def command = ""
 
                     if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
-                        echo "Dux version is 3 or higher. Running 'dux tunnel destroy'..."
-                        command = params.HOST_IP == 'All' ? 'dux tunnel destroy -y' : "dux tunnel destroy -y -p ${params.HOST_IP}"
+                        echo "Dux version is 3 or higher. Running 'dux seg restart'..."
+                        command = params.HOST_IP == 'All' ? 'dux seg restart -y' : "dux seg restart -y -p ${params.HOST_IP}"
                     } else {
-                        echo "Dux version is less than 3. Running 'dux destroy'..."
-                        command = params.HOST_IP == 'All' ? 'dux destroy -y' : "dux destroy -y -p ${params.HOST_IP}"
+                        error "Dux version is less than 3.0 . SEG container is not supported."
                     }
                     try {
-                        // Execute the `dux destroy -y` command
-                        def destroyOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
-                        echo "dux destroy command output:\n${destroyOutput}"
+                        // Execute the `dux restart` command
+                        def restartOutput = sh(script: command, returnStdout: true).trim()
+                        echo "dux restart command output:\n${restartOutput}"
                     } catch (Exception e) {
-                        // Handle errors if the `dux destroy` command fails
+                        // Handle errors if the `dux restart` command fails
                         error "Failed to execute '${command}'. Error: ${e.message}"
                     }
-
                 }
             }
         }
@@ -53,14 +51,13 @@ pipeline {
             steps {
                 script {
                     echo "Checking Dux Status..."
-                    def command = "" // Define the command variable outside the try block
+                   def command = "" 
 
                     if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
-                        echo "Dux version is 3 or higher. Running 'dux tunnel status'..."
-                        command = params.HOST_IP == 'All' ? 'dux tunnel status' : "dux tunnel status -p ${params.HOST_IP}"
+                        echo "Dux version is 3 or higher. Running 'dux seg status'..."
+                        command = params.HOST_IP == 'All' ? 'dux seg status' : "dux seg status -p ${params.HOST_IP}"
                     } else {
-                        echo "Dux version is less than 3. Running 'dux status'..."
-                        command = params.HOST_IP == 'All' ? 'dux status' : "dux status -p ${params.HOST_IP}"
+                        error "Dux version is less than 3.0 . SEG container is not supported."
                     }
 
                     
@@ -78,21 +75,20 @@ pipeline {
     }
     post {
         success {
-            echo "Remove Container operation completed successfully."
+            echo "Restart Container operation completed successfully."
         }
         failure {
-            echo "Remove Container operation failed."
+            echo "Restart Container operation failed."
         }
     }
 }
-
 
 def getHostIPs() {
     def ips = ['All']
 
     node {
         try {
-            def manifestPath = "${env.WORKSPACE}/ts_manifest.yml"
+            def manifestPath = "${env.WORKSPACE}/seg_manifest.yml"
 
             def manifestContent = readFile(manifestPath)
             echo "Manifest Content:\n${manifestContent}"
@@ -100,8 +96,8 @@ def getHostIPs() {
             def yaml = new org.yaml.snakeyaml.Yaml()
             def manifest = yaml.load(manifestContent)
 
-            if (manifest.tunnel_server?.hosts) {
-                manifest.tunnel_server.hosts.each { host ->
+            if (manifest.seg?.hosts) {
+                manifest.seg.hosts.each { host ->
                     if (host.address) {
                         ips << host.address
                     }
@@ -118,3 +114,4 @@ def getHostIPs() {
 
     return ips.join('\n')
 }
+

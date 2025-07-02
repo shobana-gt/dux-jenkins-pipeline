@@ -1,0 +1,104 @@
+pipeline {
+    agent any
+    parameters {
+        choice(
+            name: 'HOST_IP',
+            choices: getHostIPs(),
+            description: 'Select the IP address of the host (or "All" for all hosts)'
+        )
+    }
+    stages {
+        stage('Prepare Workspace') {
+            steps {
+                sh 'cp /opt/omnissa/dux/seg_manifest.yml ${WORKSPACE}/seg_manifest.yml'
+            }
+        }
+        stage('Debug File Existence') {
+            steps {
+                script {
+                    def fileExists = fileExists('seg_manifest.yml')
+                    echo "Manifest file exists: ${fileExists}"
+                }
+            }
+        }
+/*         stage('Debug Host IPs') {
+            steps {
+                script {
+                    def ips = getHostIPs()
+                    echo "Available IPs:\n${ips}"
+                }
+            }
+        } */
+        stage('Run Dux Health Check') {
+            steps {
+                script {
+                    echo "Running Dux Health Check..."
+                    def command = "" // Define the command variable outside the try block
+
+                    try {
+                    echo "Checking Dux version..."
+                    def duxVersion = sh(script: "dux version | tail -n 1", returnStdout: true).trim()
+                    echo "Dux version detected: ${duxVersion}"
+
+                    // Extract the first digit of the version
+                    def majorVersion = duxVersion.tokenize('.')[0] as int
+
+                    if (majorVersion >= 3) {
+                        echo "Dux version is 3 or higher. Running 'dux seg status'..."
+                        command = params.HOST_IP == 'All' ? 'dux seg status' : "dux seg status -p ${params.HOST_IP}"
+                    } else {
+                        error "Dux version is less than 3.0 . SEG container is not supported."
+                    }
+                        
+                        // Execute the command
+                        def statusOutput = sh(script: command, returnStdout: true).trim()
+                        echo "Dux Status Output:\n${statusOutput}"
+                    } catch (Exception e) {
+                        // Handle errors if the `dux status` command fails
+                        error "Failed to execute '${command}'. Error: ${e.message}"
+                    }
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo "Dux Health Check completed successfully."
+        }
+        failure {
+            echo "Dux Health Check failed."
+        }
+    }
+}
+
+def getHostIPs() {
+    def ips = ['All']
+
+    node {
+        try {
+            def manifestPath = "${env.WORKSPACE}/seg_manifest.yml"
+
+            def manifestContent = readFile(manifestPath)
+            echo "Manifest Content:\n${manifestContent}"
+
+            def yaml = new org.yaml.snakeyaml.Yaml()
+            def manifest = yaml.load(manifestContent)
+
+            if (manifest.seg?.hosts) {
+                manifest.seg.hosts.each { host ->
+                    if (host.address) {
+                        ips << host.address
+                    }
+                }
+            } else {
+                echo "No hosts found in the manifest file."
+            }
+
+            echo "Extracted IPs: ${ips}"
+        } catch (Exception e) {
+            echo "Failed to read or parse the manifest file: ${e.message}"
+        }
+    }
+
+    return ips.join('\n')
+}
