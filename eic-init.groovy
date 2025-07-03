@@ -1,36 +1,34 @@
 def GIT_USER_EMAIL = env.GIT_USER_EMAIL ?: 'noreply@example.com'
 def GIT_USER_NAME = env.GIT_USER_NAME ?: 'Jenkins CI'
-def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO
-def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
+def CLUSTER_CREDS_REPO = env.CLUSTER_CREDS_REPO ?: 'git@github.com:shobana-gt/container-cluster-config.git'
+def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF ?: 'github-ssh-key'
 
 pipeline {
     agent any
     parameters {
-        file(
-            name: 'POLICIES_JSON',
-            description: 'Upload the policies.json file'
-        )
-        file(
-            name: 'APPLICATION_YAML',
-            description: 'Upload the application.yaml file'
-        )
-        file(
-            name: 'LOGBACK_XML',
-            description: 'Upload the logback.xml file'
+        string(
+            name: 'CLUSTER_BRANCH',
+            defaultValue: 'main',
+            description: 'Branch to checkout from cluster secrets repository'
         )
         string(
             name: 'ARTIFACTORY_PATH',
             defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm',
             description: 'Path to the Dux RPM in the artifactory'
         )
-        string(
-            name: 'CLUSTER_BRANCH',
-            defaultValue: null,
-            description: 'Branch to checkout from cluster secrets repository'
-        )
     }
-    
     stages {
+        stage('Clone Cluster Repository') {
+            steps {
+                script {
+                    echo "Cloning cluster repository from ${CLUSTER_CREDS_REPO} branch ${params.CLUSTER_BRANCH}..."
+                    sh """
+                        rm -rf repo
+                        git clone -b ${params.CLUSTER_BRANCH} ${CLUSTER_CREDS_REPO} repo
+                    """
+                }
+            }
+        }
         stage('Prepare EIC Config Directory') {
             steps {
                 script {
@@ -41,23 +39,14 @@ pipeline {
                 }
             }
         }
-        stage('Debug Uploaded Files') {
+        stage('Copy Files to Target Directory') {
             steps {
                 script {
-                    echo "Checking uploaded files in workspace..."
-                    sh "ls -ltr ${WORKSPACE}"
-                    sh "ls -ltr ${WORKSPACE}@tmp"
-                }
-            }
-        }
-        stage('Copy Uploaded Files') {
-            steps {
-                script {
-                    echo "Copying uploaded files from Jenkins workspace to /opt/omnissa/dux/eic-config directory..."
+                    echo "Copying files from repo/config/eic-config to /opt/omnissa/dux/eic-config..."
                     sh """
-                        cp ${WORKSPACE}/POLICIES_JSON /opt/omnissa/dux/eic-config/policies.json
-                        cp ${WORKSPACE}/APPLICATION_YAML /opt/omnissa/dux/eic-config/application.yaml
-                        cp ${WORKSPACE}/LOGBACK_XML /opt/omnissa/dux/eic-config/logback.xml
+                        cp repo/config/eic-config/policies.json /opt/omnissa/dux/eic-config/policies.json
+                        cp repo/config/eic-config/application.yaml /opt/omnissa/dux/eic-config/application.yaml
+                        cp repo/config/eic-config/logback.xml /opt/omnissa/dux/eic-config/logback.xml
                     """
                 }
             }
