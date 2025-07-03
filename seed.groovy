@@ -128,6 +128,23 @@ containers.each { container, jobs ->
                     )
                     stringParam('CLUSTER_BRANCH', null, 'Branch to checkout from cluster secrets repository')
                 }
+                // Add additional parameters only for the Init job of the EIC container
+                if (container == 'EIC') {
+                    parameters {
+                        file(
+                            name: 'POLICIES_JSON',
+                            description: 'Upload the policies.json file'
+                        )
+                        file(
+                            name: 'LOGBACK_XML',
+                            description: 'Upload the logback.xml file'
+                        )
+                        file(
+                            name: 'APPLICATION_YAML',
+                            description: 'Upload the application.yaml file'
+                        )
+                    }
+                }
             }
             if (job == 'Deploy') {
 
