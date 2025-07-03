@@ -129,7 +129,7 @@ containers.each { container, jobs ->
                     stringParam('CLUSTER_BRANCH', null, 'Branch to checkout from cluster secrets repository')
                 }
                 // Add additional parameters only for the Init job of the EIC container
-                if (container == 'EIC') {
+               /* if (container == 'EIC') {
                     parameters {
                         stringParam(
                             'POLICIES_JSON',
@@ -148,7 +148,7 @@ containers.each { container, jobs ->
                         )
 
                     }
-                }
+                }*/
             }
             if (job == 'Deploy') {
 

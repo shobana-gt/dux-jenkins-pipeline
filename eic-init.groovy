@@ -29,6 +29,7 @@ pipeline {
             description: 'Branch to checkout from cluster secrets repository'
         )
     }
+    
     stages {
         stage('Prepare EIC Config Directory') {
             steps {
@@ -40,14 +41,23 @@ pipeline {
                 }
             }
         }
+        stage('Debug Uploaded Files') {
+            steps {
+                script {
+                    echo "Checking uploaded files in workspace..."
+                    sh "ls -ltr ${WORKSPACE}"
+                    sh "ls -ltr ${WORKSPACE}@tmp"
+                }
+            }
+        }
         stage('Copy Uploaded Files') {
             steps {
                 script {
                     echo "Copying uploaded files from Jenkins workspace to /opt/omnissa/dux/eic-config directory..."
                     sh """
-                        cp ${WORKSPACE}/${params.POLICIES_JSON} /opt/omnissa/dux/eic-config/policies.json
-                        cp ${WORKSPACE}/${params.APPLICATION_YAML} /opt/omnissa/dux/eic-config/application.yaml
-                        cp ${WORKSPACE}/${params.LOGBACK_XML} /opt/omnissa/dux/eic-config/logback.xml
+                        cp ${WORKSPACE}/POLICIES_JSON /opt/omnissa/dux/eic-config/policies.json
+                        cp ${WORKSPACE}/APPLICATION_YAML /opt/omnissa/dux/eic-config/application.yaml
+                        cp ${WORKSPACE}/LOGBACK_XML /opt/omnissa/dux/eic-config/logback.xml
                     """
                 }
             }
