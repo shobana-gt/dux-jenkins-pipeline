@@ -43,11 +43,11 @@ pipeline {
         stage('Copy Uploaded Files') {
             steps {
                 script {
-                    echo "Copying uploaded files to /opt/omnissa/dux/eic-config directory..."
+                    echo "Copying uploaded files from Jenkins workspace to /opt/omnissa/dux/eic-config directory..."
                     sh """
-                        cp ${params.POLICIES_JSON} /opt/omnissa/dux/eic-config/policies.json
-                        cp ${params.APPLICATION_YAML} /opt/omnissa/dux/eic-config/application.yaml
-                        cp ${params.LOGBACK_XML} /opt/omnissa/dux/eic-config/logback.xml
+                        cp ${WORKSPACE}/${params.POLICIES_JSON} /opt/omnissa/dux/eic-config/policies.json
+                        cp ${WORKSPACE}/${params.APPLICATION_YAML} /opt/omnissa/dux/eic-config/application.yaml
+                        cp ${WORKSPACE}/${params.LOGBACK_XML} /opt/omnissa/dux/eic-config/logback.xml
                     """
                 }
             }

@@ -131,18 +131,22 @@ containers.each { container, jobs ->
                 // Add additional parameters only for the Init job of the EIC container
                 if (container == 'EIC') {
                     parameters {
-                        file(
-                            name: 'POLICIES_JSON',
-                            description: 'Upload the policies.json file'
+                        stringParam(
+                            'POLICIES_JSON',
+                            '/opt/omnissa/dux/eic-config/policies.json',
+                            'Path to the policies.json file'
                         )
-                        file(
-                            name: 'LOGBACK_XML',
-                            description: 'Upload the logback.xml file'
+                        stringParam(
+                            'LOGBACK_XML',
+                            '/opt/omnissa/dux/eic-config/logback.xml',
+                            'Path to the logback.xml file'
                         )
-                        file(
-                            name: 'APPLICATION_YAML',
-                            description: 'Upload the application.yaml file'
+                        stringParam(
+                            'APPLICATION_YAML',
+                            '/opt/omnissa/dux/eic-config/application.yaml',
+                            'Path to the application.yaml file'
                         )
+
                     }
                 }
             }
