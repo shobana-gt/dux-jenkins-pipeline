@@ -162,7 +162,7 @@ pipeline {
                     }
                     try {
                         // Execute the `dux deploy -d` command
-                        def dryRunOutput = sh(script: command, returnStdout: true).trim()
+                        def dryRunOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                         echo "dux deploy dryrun command output:\n${dryRunOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux deploy -d` command fails

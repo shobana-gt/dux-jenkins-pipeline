@@ -38,7 +38,7 @@ pipeline {
                     }
                     try {
                         // Execute the `dux destroy -y` command
-                        def destroyOutput = sh(script: command, returnStdout: true).trim()
+                        def destroyOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                         echo "dux destroy command output:\n${destroyOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux destroy` command fails

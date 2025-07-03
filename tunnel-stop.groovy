@@ -39,7 +39,7 @@ pipeline {
                     }
                     try {
                         // Execute the `dux stop` command
-                        def stopOutput = sh(script: command, returnStdout: true).trim()
+                        def stopOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                         echo "dux stop command output:\n${stopOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux stop` command fails

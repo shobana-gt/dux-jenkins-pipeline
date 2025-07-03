@@ -46,7 +46,7 @@ pipeline {
                         error "Dux version is less than 3.0 . SEG container is not supported."
                     }
 
-                    def logsOutput = sh(script: command, returnStdout: true).trim()
+                    def logsOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                     echo "Dux logs command output:\n${logsOutput}"
                 }
             }

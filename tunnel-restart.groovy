@@ -39,7 +39,7 @@ pipeline {
                     }
                     try {
                         // Execute the `dux restart` command
-                        def restartOutput = sh(script: command, returnStdout: true).trim()
+                        def restartOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                         echo "dux restart command output:\n${restartOutput}"
                     } catch (Exception e) {
                         // Handle errors if the `dux restart` command fails

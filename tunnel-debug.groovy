@@ -47,7 +47,7 @@ pipeline {
                         command = params.HOST_IP == 'All' ? 'dux logs' : "dux logs -p ${params.HOST_IP}"
                     }
 
-                    def logsOutput = sh(script: command, returnStdout: true).trim()
+                    def logsOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                     echo "Dux logs command output:\n${logsOutput}"
                 }
             }
@@ -66,7 +66,7 @@ pipeline {
                         command = params.HOST_IP == 'All' ? 'dux report' : "dux report -p ${params.HOST_IP}"
                     }
 
-                    def reportOutput = sh(script: command, returnStdout: true).trim()
+                    def reportOutput = sh(script: "${command} 2>&1", returnStdout: true).trim()
                     echo "Dux Report Output:\n${reportOutput}"
                 }
             }
