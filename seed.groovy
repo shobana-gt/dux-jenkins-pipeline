@@ -60,7 +60,8 @@ def credentialsId = 'github-ssh-key'
 def containers = [
     'Tunnel': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
     'EIC': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
-    'SEG': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove']
+    'SEG': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
+    'PacReader': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
 ]
 // Helper function to determine the manifest path based on the container name
 def getManifestPath(container) {
@@ -71,6 +72,8 @@ def getManifestPath(container) {
             return "/opt/omnissa/dux/eic_manifest.yml"
         case 'seg':
             return "/opt/omnissa/dux/seg_manifest.yml"
+        case 'pacreader':
+            return "/opt/omnissa/dux/pr_manifest.yml"
         default:
             return "/opt/omnissa/dux/ts_manifest.yml" // Fallback for unknown containers
     }
