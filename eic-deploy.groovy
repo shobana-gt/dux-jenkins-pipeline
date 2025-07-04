@@ -168,7 +168,7 @@ pipeline {
                 }
             }
         }
-        stage('Run Dux Deploy with UEM Password') {
+        stage('Run Dux Deploy EIC container') {
             steps {
                 script {
                     def command = ""
@@ -185,7 +185,7 @@ pipeline {
                         echo "dux deploy command output:\n${deployOutput}"
 
                         if (!deployOutput.contains("Deployment is up")) {
-                            error "Dux Deploy with UEM Password failed. Exiting pipeline."
+                            error "Dux Deploy EIC container failed. Exiting pipeline."
                         }
 
                     } catch (Exception e) {
