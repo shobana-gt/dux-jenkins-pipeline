@@ -63,18 +63,39 @@ pipeline {
                     """
                     if (!lastHashExists) {
                  echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
-                    withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
-                        sh """
-                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
-                            cp ${manifestPath} repo/${configDir}/
-                            cd repo
-                            git config user.email "${GIT_USER_EMAIL}"
-                            git config user.name "${GIT_USER_NAME}"
-                            git add ${configDir}/ts_manifest.yml
-                            git commit -m 'created ts_manifest.yml'
-                            git push origin ${branchName}
-                        """
-                    }
+                                 withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                        script {
+                                            branchName = params.CLUSTER_BRANCH
+                                            def repoUrl = CLUSTER_CREDS_REPO
+
+                                            // Check if the branch exists in the remote repository
+                                            def branchExists = sh(
+                                                script: """
+                                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
+                                                """,
+                                                returnStdout: true
+                                            ).trim() == "1"
+
+                                            if (!branchExists) {
+                                                echo "Branch '${branchName}' does not exist in the remote repository. Creating it now..."
+
+                                                // Clone the repository and create the branch
+                                                sh """
+                                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                                    cd repo
+                                                    git checkout -b ${branchName}
+                                                    git push origin ${branchName}
+                                                """
+                                            } else {
+                                                echo "Branch '${branchName}' already exists in the remote repository."
+                                            }
+
+                                            // Proceed with cloning the branch
+                                            sh """
+                                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${repoUrl} repo
+                                            """
+                                        }
+                                    }
                     writeFile file: lastHashFile, text: currentHash
                     } else {
                         def lastHash = readFile(lastHashFile).trim()
