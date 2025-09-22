@@ -46,81 +46,76 @@ pipeline {
                 script {
                     def manifestPath = params.manifestPath
                     def lastHashFile = '/var/lib/jenkins/last_ts_manifest_md5'
-                    def repoPath = CLUSTER_CREDS_REPO
+                    def repoUrl = CLUSTER_CREDS_REPO
                     def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
                     def configDir = 'config'
 
                     // Calculate current hash of ts_manifest.yml
                     def currentHash = sh(script: "md5sum ${manifestPath} | awk '{print \$1}'", returnStdout: true).trim()
 
-                    // Check if last hash file exists
-                    def lastHashExists = fileExists(lastHashFile)
                     // Ensure the repo directory is clean
                     sh """
                         if [ -d repo ]; then
                             rm -rf repo
                         fi
                     """
+
+                    // Check if last hash file exists
+                    def lastHashExists = fileExists(lastHashFile)
+
                     if (!lastHashExists) {
-                 echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
-                                 withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
-                                        script {
-                                            branchName = params.CLUSTER_BRANCH
-                                            def repoUrl = CLUSTER_CREDS_REPO
-
-                                            // Check if the branch exists in the remote repository
-                                            def branchExists = sh(
-                                                script: """
-                                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
-                                                """,
-                                                returnStdout: true
-                                            ).trim() == "1"
-
-                                            if (!branchExists) {
-                                                echo "Branch '${branchName}' does not exist in the remote repository. Creating it now..."
-
-                                                // Clone the repository and create the branch
-                                                sh """
-                                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
-                                                    cd repo
-                                                    git checkout -b ${branchName}
-                                                    git push origin ${branchName}
-                                                """
-                                            } else {
-                                                echo "Branch '${branchName}' already exists in the remote repository."
-                                            }
-
-                                            // Proceed with cloning the branch
-                                            sh """
-                                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${repoUrl} repo
-                                            """
-                                        }
-                                    }
-                    writeFile file: lastHashFile, text: currentHash
-                    } else {
-                        def lastHash = readFile(lastHashFile).trim()
-                        if (currentHash != lastHash) {
-                        echo "File has changed: Pushing ts_manifest.yml to GitHub with comment 'user edit'"
+                        echo "First time run: Pushing ts_manifest.yml to GitHub with comment 'created ts_manifest.yml'"
                         withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                            // Clone the repository
                             sh """
-                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
+                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                cd repo
+                                git checkout -b ${branchName}
+                            """
+                            // Copy the manifest file to the repository
+                            sh """
                                 cp ${manifestPath} repo/${configDir}/
                                 cd repo
                                 git config user.email "${GIT_USER_EMAIL}"
                                 git config user.name "${GIT_USER_NAME}"
                                 git add ${configDir}/ts_manifest.yml
-                                git commit -m 'user edit'
+                                git commit -m 'created ts_manifest.yml'
                                 git push origin ${branchName}
                             """
                         }
+                        // Write the current hash to the lastHashFile
                         writeFile file: lastHashFile, text: currentHash
+                    } else {
+                        // Read the last hash from the file
+                        def lastHash = readFile(lastHashFile).trim()
+                        if (currentHash != lastHash) {
+                            echo "File has changed: Pushing ts_manifest.yml to GitHub with comment 'user edit'"
+                            withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                // Clone the repository
+                                sh """
+                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${repoUrl} repo
+                                """
+                                // Copy the updated manifest file to the repository
+                                sh """
+                                    cp ${manifestPath} repo/${configDir}/
+                                    cd repo
+                                    git config user.email "${GIT_USER_EMAIL}"
+                                    git config user.name "${GIT_USER_NAME}"
+                                    git add ${configDir}/ts_manifest.yml
+                                    git commit -m 'user edit'
+                                    git push origin ${branchName}
+                                """
+                            }
+                            // Update the last hash file with the new hash
+                            writeFile file: lastHashFile, text: currentHash
                         } else {
                             echo "No changes detected in ts_manifest.yml"
                         }
                     }
+                    }
                 }
-            }
         }
+
        /*  stage('Pre-check Hosts in ts_manifest.yml') {
             steps {
                 script {
