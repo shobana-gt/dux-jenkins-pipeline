@@ -18,7 +18,17 @@ pipeline {
         )
     }
     stages {
-
+        stage('Clone Cluster Repository') {
+            steps {
+                script {
+                    echo "Cloning cluster repository from ${CLUSTER_CREDS_REPO} branch ${params.CLUSTER_BRANCH}..."
+                    sh """
+                        rm -rf repo
+                        git clone -b ${params.CLUSTER_BRANCH} ${CLUSTER_CREDS_REPO} repo
+                    """
+                }
+            }
+        }
         stage('Prepare EIC Config Directory') {
             steps {
                 script {
