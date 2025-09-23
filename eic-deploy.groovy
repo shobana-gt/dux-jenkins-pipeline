@@ -243,7 +243,7 @@ pipeline {
 
                     if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
                         echo "Dux version is 3 or higher. Running 'dux eic deploy'..."
-                        command = params.HOST_IP == 'All' ? "dux eic deploy -y" : "dux deploy -y -p ${params.HOST_IP}"
+                        command = params.HOST_IP == 'All' ? "dux eic deploy -y" : "dux eic deploy -y -p ${params.HOST_IP}"
                     } else {
                         error "Dux version is less than 3.0 . EIC container is not supported."
                     }
