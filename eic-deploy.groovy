@@ -43,53 +43,111 @@ pipeline {
                 script {
                     def manifestPath = params.manifestPath
                     def lastHashFile = '/var/lib/jenkins/last_eic_manifest_md5'
-                    def repoPath = CLUSTER_CREDS_REPO
-                    def branchName = params.CLUSTER_BRANCH // Use the branch configured in seed.groovy
+                    def repoUrl = CLUSTER_CREDS_REPO
+                    def branchName = params.CLUSTER_BRANCH
                     def configDir = 'config'
 
                     // Calculate current hash of eic_manifest.yml
                     def currentHash = sh(script: "md5sum ${manifestPath} | awk '{print \$1}'", returnStdout: true).trim()
 
-                    // Check if last hash file exists
-                    def lastHashExists = fileExists(lastHashFile)
                     // Ensure the repo directory is clean
                     sh """
                         if [ -d repo ]; then
                             rm -rf repo
                         fi
                     """
+
+                    // Check if last hash file exists
+                    def lastHashExists = fileExists(lastHashFile)
+
                     if (!lastHashExists) {
-                    echo "First time run: Pushing eic_manifest.yml to GitHub with comment 'created eic_manifest.yml'"
-                    withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
-                        sh """
-                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
-                            cp ${manifestPath} repo/${configDir}/
-                            cd repo
-                            git config user.email "${GIT_USER_EMAIL}"
-                            git config user.name "${GIT_USER_NAME}"
-                            git add ${configDir}/eic_manifest.yml
-                            git commit -m 'created eic_manifest.yml'
-                            git push origin ${branchName}
-                        """
-                    }
-                    writeFile file: lastHashFile, text: currentHash
-                    } else {
-                        def lastHash = readFile(lastHashFile).trim()
-                        if (currentHash != lastHash) {
-                        echo "File has changed: Pushing eic_manifest.yml to GitHub with comment 'user edit'"
+                        echo "First time run: Creating eic_manifest.yml in GitHub"
                         withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                            // Check if the branch exists in the remote repository
+                            def branchExists = sh(
+                                script: """
+                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
+                                """,
+                                returnStdout: true
+                            ).trim() == "1"
+
+                            if (branchExists) {
+                                echo "Branch '${branchName}' exists. Cloning and updating..."
+                                // Clone the repository and checkout the branch
+                                sh """
+                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                    cd repo
+                                    git checkout ${branchName}
+                                """
+                            } else {
+                                echo "Branch '${branchName}' does not exist. Creating it..."
+                                // Clone the repository and create the branch
+                                sh """
+                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                    cd repo
+                                    git checkout -b ${branchName}
+                                """
+                            }
+
+                            // Copy the manifest file to the repository and push changes
                             sh """
-                                GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone -b ${branchName} ${CLUSTER_CREDS_REPO} repo
                                 cp ${manifestPath} repo/${configDir}/
                                 cd repo
                                 git config user.email "${GIT_USER_EMAIL}"
                                 git config user.name "${GIT_USER_NAME}"
                                 git add ${configDir}/eic_manifest.yml
-                                git commit -m 'user edit'
+                                git commit -m 'created eic_manifest.yml'
                                 git push origin ${branchName}
                             """
                         }
+                        // Write the current hash to the lastHashFile
                         writeFile file: lastHashFile, text: currentHash
+                    } else {
+                        echo "Updating eic_manifest.yml in GitHub"
+                        def lastHash = readFile(lastHashFile).trim()
+
+                        if (currentHash != lastHash) {
+                            echo "File has changed. Updating GitHub..."
+                            withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                // Check if the branch exists in the remote repository
+                                def branchExists = sh(
+                                    script: """
+                                        GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
+                                    """,
+                                    returnStdout: true
+                                ).trim() == "1"
+
+                                if (branchExists) {
+                                    echo "Branch '${branchName}' exists. Cloning and updating..."
+                                    // Clone the repository and checkout the branch
+                                    sh """
+                                        GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                        cd repo
+                                        git checkout ${branchName}
+                                    """
+                                } else {
+                                    echo "Branch '${branchName}' does not exist. Creating it..."
+                                    // Clone the repository and create the branch
+                                    sh """
+                                        GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                        cd repo
+                                        git checkout -b ${branchName}
+                                    """
+                                }
+
+                                // Copy the manifest file to the repository and push changes
+                                sh """
+                                    cp ${manifestPath} repo/${configDir}/
+                                    cd repo
+                                    git config user.email "${GIT_USER_EMAIL}"
+                                    git config user.name "${GIT_USER_NAME}"
+                                    git add ${configDir}/eic_manifest.yml
+                                    git commit -m 'updated eic_manifest.yml'
+                                    git push origin ${branchName}
+                                """
+                            }
+                            // Update the last hash file with the new hash
+                            writeFile file: lastHashFile, text: currentHash
                         } else {
                             echo "No changes detected in eic_manifest.yml"
                         }
