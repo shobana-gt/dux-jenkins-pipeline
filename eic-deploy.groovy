@@ -39,75 +39,33 @@ pipeline {
             }
         }
         stage('Check eic_manifest.yml Changes') {
-            steps {
-                script {
-                    def manifestPath = params.manifestPath
-                    def lastHashFile = '/var/lib/jenkins/last_eic_manifest_md5'
-                    def repoUrl = CLUSTER_CREDS_REPO
-                    def branchName = params.CLUSTER_BRANCH
-                    def configDir = 'config'
+                steps {
+                    script {
+                        def manifestPath = params.manifestPath
+                        def lastHashFile = '/var/lib/jenkins/last_eic_manifest_md5'
+                        def configDir = 'config'
+                        def eicConfigDir = '/opt/omnissa/dux/eic-config'
+                        def repoUrl = CLUSTER_CREDS_REPO
+                        def branchName = params.CLUSTER_BRANCH
 
-                    // Calculate current hash of eic_manifest.yml
-                    def currentHash = sh(script: "md5sum ${manifestPath} | awk '{print \$1}'", returnStdout: true).trim()
+                        // Calculate current hash of eic_manifest.yml
+                        def currentManifestHash = sh(script: "md5sum ${manifestPath} | awk '{print \$1}'", returnStdout: true).trim()
 
-                    // Ensure the repo directory is clean
-                    sh """
-                        if [ -d repo ]; then
-                            rm -rf repo
-                        fi
-                    """
+                        // Calculate current hash of the eic-config directory
+                        def currentConfigHash = sh(script: "find ${eicConfigDir} -type f -exec md5sum {} + | sort | md5sum | awk '{print \$1}'", returnStdout: true).trim()
 
-                    // Check if last hash file exists
-                    def lastHashExists = fileExists(lastHashFile)
+                        // Ensure the repo directory is clean
+                        sh """
+                            if [ -d repo ]; then
+                                rm -rf repo
+                            fi
+                        """
 
-                    if (!lastHashExists) {
-                        echo "First time run: Creating eic_manifest.yml in GitHub"
-                        withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
-                            // Check if the branch exists in the remote repository
-                            def branchExists = sh(
-                                script: """
-                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
-                                """,
-                                returnStdout: true
-                            ).trim() == "1"
+                        // Check if last hash file exists
+                        def lastHashExists = fileExists(lastHashFile)
 
-                            if (branchExists) {
-                                echo "Branch '${branchName}' exists. Cloning and updating..."
-                                // Clone the repository and checkout the branch
-                                sh """
-                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
-                                    cd repo
-                                    git checkout ${branchName}
-                                """
-                            } else {
-                                echo "Branch '${branchName}' does not exist. Creating it..."
-                                // Clone the repository and create the branch
-                                sh """
-                                    GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
-                                    cd repo
-                                    git checkout -b ${branchName}
-                                """
-                            }
-
-                            // Copy the manifest file to the repository and push changes
-                            sh """
-                                cp ${manifestPath} repo/${configDir}/
-                                cd repo
-                                git config user.email "${GIT_USER_EMAIL}"
-                                git config user.name "${GIT_USER_NAME}"
-                                git add ${configDir}/eic_manifest.yml
-                                git commit -m 'created eic_manifest.yml'
-                                git push origin ${branchName}
-                            """
-                        }
-                        // Write the current hash to the lastHashFile
-                        writeFile file: lastHashFile, text: currentHash
-                    } else {
-                        echo "Updating eic_manifest.yml in GitHub"
-                        def lastHash = readFile(lastHashFile).trim()
-
-                        if (currentHash != lastHash) {
-                            echo "File has changed. Updating GitHub..."
+                        if (!lastHashExists) {
+                            echo "First time run: Creating eic_manifest.yml and eic-config in GitHub"
                             withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
                                 // Check if the branch exists in the remote repository
                                 def branchExists = sh(
@@ -135,25 +93,77 @@ pipeline {
                                     """
                                 }
 
-                                // Copy the manifest file to the repository and push changes
+                                // Copy the manifest file and eic-config directory to the repository and push changes
                                 sh """
                                     cp ${manifestPath} repo/${configDir}/
+                                    cp -r ${eicConfigDir}/* repo/${configDir}/
                                     cd repo
                                     git config user.email "${GIT_USER_EMAIL}"
                                     git config user.name "${GIT_USER_NAME}"
                                     git add ${configDir}/eic_manifest.yml
-                                    git commit -m 'updated eic_manifest.yml'
+                                    git add ${configDir}/*
+                                    git commit -m 'created eic_manifest.yml and eic-config'
                                     git push origin ${branchName}
                                 """
                             }
-                            // Update the last hash file with the new hash
-                            writeFile file: lastHashFile, text: currentHash
+                            // Write the current hashes to the lastHashFile
+                            writeFile file: lastHashFile, text: "${currentManifestHash}\n${currentConfigHash}"
                         } else {
-                            echo "No changes detected in eic_manifest.yml"
+                            echo "Updating eic_manifest.yml and eic-config in GitHub"
+                            def lastHashes = readFile(lastHashFile).trim().split("\n")
+                            def lastManifestHash = lastHashes[0]
+                            def lastConfigHash = lastHashes.size() > 1 ? lastHashes[1] : ""
+
+                            if (currentManifestHash != lastManifestHash || currentConfigHash != lastConfigHash) {
+                                echo "Changes detected in eic_manifest.yml or eic-config. Updating GitHub..."
+                                withCredentials([sshUserPrivateKey(credentialsId: CLUSTER_CREDS_GIT_CRED_REF, keyFileVariable: 'SSH_KEY')]) {
+                                    // Check if the branch exists in the remote repository
+                                    def branchExists = sh(
+                                        script: """
+                                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git ls-remote --heads ${repoUrl} ${branchName} | wc -l
+                                        """,
+                                        returnStdout: true
+                                    ).trim() == "1"
+
+                                    if (branchExists) {
+                                        echo "Branch '${branchName}' exists. Cloning and updating..."
+                                        // Clone the repository and checkout the branch
+                                        sh """
+                                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                            cd repo
+                                            git checkout ${branchName}
+                                        """
+                                    } else {
+                                        echo "Branch '${branchName}' does not exist. Creating it..."
+                                        // Clone the repository and create the branch
+                                        sh """
+                                            GIT_SSH_COMMAND='ssh -i ${SSH_KEY}' git clone ${repoUrl} repo
+                                            cd repo
+                                            git checkout -b ${branchName}
+                                        """
+                                    }
+
+                                    // Copy the manifest file and eic-config directory to the repository and push changes
+                                    sh """
+                                        cp ${manifestPath} repo/${configDir}/
+                                        cp -r ${eicConfigDir}/* repo/${configDir}/
+                                        cd repo
+                                        git config user.email "${GIT_USER_EMAIL}"
+                                        git config user.name "${GIT_USER_NAME}"
+                                        git add ${configDir}/eic_manifest.yml
+                                        git add ${configDir}/*
+                                        git commit -m 'updated eic_manifest.yml and/or eic-config'
+                                        git push origin ${branchName}
+                                    """
+                                }
+                                // Update the last hash file with the new hashes
+                                writeFile file: lastHashFile, text: "${currentManifestHash}\n${currentConfigHash}"
+                            } else {
+                                echo "No changes detected in eic_manifest.yml or eic-config"
+                            }
                         }
                     }
                 }
-            }
         }
        /*  stage('Pre-check Hosts in eic_manifest.yml') {
             steps {
