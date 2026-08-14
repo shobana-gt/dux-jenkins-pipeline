@@ -62,6 +62,7 @@ def containers = [
     'EIC': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
     'SEG': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
     'PacReader': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
+    'CG': ['Init', 'Deploy', 'Healthcheck', 'Debug', 'Stop', 'Restart', 'Remove'],
 ]
 // Helper function to determine the manifest path based on the container name
 def getManifestPath(container) {
@@ -74,6 +75,8 @@ def getManifestPath(container) {
             return "/opt/omnissa/dux/seg_manifest.yml"
         case 'pacreader':
             return "/opt/omnissa/dux/pr_manifest.yml"
+        case 'cg':
+            return "/opt/omnissa/dux/cg_manifest.yml"
         default:
             return "/opt/omnissa/dux/ts_manifest.yml" // Fallback for unknown containers
     }
@@ -126,7 +129,7 @@ containers.each { container, jobs ->
                 parameters {
                     stringParam(
                         'ARTIFACTORY_PATH',
-                        'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm',
+                        'https://packages.omnissa.com/ws1-tunnel/dux/3.1.2.1076/dux-3.1.2.1076-1.x86_64.rpm',
                         'Path to the Dux RPM in the artifactory'
                     )
                     stringParam('CLUSTER_BRANCH', null, 'Branch to checkout from cluster secrets repository')

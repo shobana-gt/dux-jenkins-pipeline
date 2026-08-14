@@ -7,7 +7,7 @@ def CLUSTER_CREDS_GIT_CRED_REF = env.CLUSTER_CREDS_GIT_CRED_REF
 pipeline {
     agent any
     parameters {
-        string(name: 'ARTIFACTORY_PATH', defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm', description: 'Path to the Dux RPM in the artifactory')
+        string(name: 'ARTIFACTORY_PATH', defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/3.1.2.1076/dux-3.1.2.1076-1.x86_64.rpm', description: 'Path to the Dux RPM in the artifactory')
         string(name: 'CLUSTER_BRANCH',
                defaultValue: null,
                description: 'Branch to checkout from cluster secrets repository')
