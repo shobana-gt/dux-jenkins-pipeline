@@ -13,7 +13,7 @@ pipeline {
         )
         string(
             name: 'ARTIFACTORY_PATH',
-            defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/2.3.0.405/dux-2.3.0.405-1.x86_64.rpm',
+            defaultValue: 'https://packages.omnissa.com/ws1-tunnel/dux/3.1.2.1076/dux-3.1.2.1076-1.x86_64.rpm',
             description: 'Path to the Dux RPM in the artifactory'
         )
     }
