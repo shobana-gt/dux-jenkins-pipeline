@@ -161,6 +161,31 @@ pipeline {
             }
         }
 
+        stage('Trust Host SSH Keys') {
+            steps {
+                script {
+                    def manifestContent = readFile("${env.WORKSPACE}/cg_manifest.yml")
+                    def yaml = new org.yaml.snakeyaml.Yaml()
+                    def manifest = yaml.load(manifestContent)
+                    def hosts = manifest.content_gateway?.hosts?.collect { it.address }?.findAll { it }
+
+                    if (!hosts) {
+                        error "No hosts found in cg_manifest.yml to scan SSH keys for."
+                    }
+
+                    def selectedHosts = (params.HOST_IP == 'All') ? hosts : [params.HOST_IP]
+
+                    sh "mkdir -p ~/.ssh && touch ~/.ssh/known_hosts"
+                    selectedHosts.each { host ->
+                        // Remove stale entry first, then add current key
+                        sh "ssh-keygen -R ${host} -f ~/.ssh/known_hosts || true"
+                        sh "ssh-keyscan -H ${host} >> ~/.ssh/known_hosts"
+                    }
+                    echo "SSH host keys added for: ${selectedHosts.join(', ')}"
+                }
+            }
+        }
+
         stage('Run Dux Deploy -d') {
             steps {
                 script {
@@ -191,7 +216,8 @@ pipeline {
 
                     if (env.DUX_MAJOR_VERSION.toInteger() >= 3) {
                         echo "Dux version is 3 or higher. Running 'dux cg deploy'..."
-                        command = params.HOST_IP == 'All' ? "dux cg deploy -u ${env.UEM_PASSWORD} -y" : "dux cg deploy -u ${env.UEM_PASSWORD} -y -p ${params.HOST_IP}"
+                        // Use single-quoted shell variable to avoid interpolating the secret into the Groovy string
+                        command = params.HOST_IP == 'All' ? 'dux cg deploy -u $UEM_PASSWORD -y' : "dux cg deploy -u \$UEM_PASSWORD -y -p ${params.HOST_IP}"
                     } else {
                         error "Dux version is less than 3.0. Content Gateway container is not supported."
                     }
