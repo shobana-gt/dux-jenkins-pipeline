@@ -201,7 +201,7 @@ pipeline {
                         def deployOutput = sh(script: command, returnStdout: true).trim()
                         echo "dux deploy command output:\n${deployOutput}"
 
-                        if (!deployOutput.contains("Deployment is up")) {
+                        if (!deployOutput.contains("Status: UP")) {
                             error "Dux Deploy with UEM Password failed. Exiting pipeline."
                         }
                     } catch (Exception e) {
