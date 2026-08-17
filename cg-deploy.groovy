@@ -161,31 +161,6 @@ pipeline {
             }
         }
 
-        stage('Trust Host SSH Keys') {
-            steps {
-                script {
-                    def manifestContent = readFile("${env.WORKSPACE}/cg_manifest.yml")
-                    def yaml = new org.yaml.snakeyaml.Yaml()
-                    def manifest = yaml.load(manifestContent)
-                    def hosts = manifest.content_gateway?.hosts?.collect { it.address }?.findAll { it }
-
-                    if (!hosts) {
-                        error "No hosts found in cg_manifest.yml to scan SSH keys for."
-                    }
-
-                    def selectedHosts = (params.HOST_IP == 'All') ? hosts : [params.HOST_IP]
-
-                    sh "mkdir -p ~/.ssh && touch ~/.ssh/known_hosts"
-                    selectedHosts.each { host ->
-                        // Remove stale entry first, then add current key
-                        sh "ssh-keygen -R ${host} -f ~/.ssh/known_hosts || true"
-                        sh "ssh-keyscan -H ${host} >> ~/.ssh/known_hosts"
-                    }
-                    echo "SSH host keys added for: ${selectedHosts.join(', ')}"
-                }
-            }
-        }
-
         stage('Run Dux Deploy -d') {
             steps {
                 script {
